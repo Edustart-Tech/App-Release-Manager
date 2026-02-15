@@ -1,0 +1,6 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running `target/debug/updater`
+
+thread 'main' panicked at src/main.rs:96:10:
+Path segments must not start with `:`. For capture groups, use `{capture}`. If you meant to literally match a segment starting with a colon, call `without_v07_checks` on the router.
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
