@@ -77,6 +77,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "/{app_name}/{target}/{arch}/{current_version}",
             get(routes::check_update),
         )
+        .route(
+            "/latest/{app_name}/{target}/{arch}",
+            get(routes::get_latest_version),
+        )
+        .route(
+            "/download/latest/{app_name}/{target}/{arch}",
+            get(routes::download_latest_release),
+        )
         .route("/upload", post(routes::upload_release))
         .layer(DefaultBodyLimit::disable())
         .layer(CorsLayer::permissive())

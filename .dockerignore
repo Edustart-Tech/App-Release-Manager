@@ -1,0 +1,7 @@
+target/
+.git/
+.gitignore
+updater.db
+*.py
+*.md
+.env

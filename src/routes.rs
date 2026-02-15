@@ -242,3 +242,85 @@ pub async fn upload_release(
     println!("Release process completed successfully.");
     (StatusCode::CREATED, Json(download_url)).into_response()
 }
+
+// Handler to get the latest version (without update check logic)
+pub async fn get_latest_version(
+    Path((app_name, target, arch)): Path<(String, String, String)>,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    println!(
+        "Received latest version check: app_name={}, target={}, arch={}",
+        app_name, target, arch
+    );
+
+    // Fetch all releases for this app/target/arch
+    let releases = sqlx::query_as::<_, Release>(
+        "SELECT id, app_name, target, arch, version, url, signature, pub_date, notes FROM releases WHERE app_name = ? AND target = ? AND arch = ?"
+    )
+    .bind(&app_name)
+    .bind(&target)
+    .bind(&arch)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_else(|_| vec![]);
+
+    // Find the latest version
+    let latest_release = releases
+        .into_iter()
+        .filter_map(|r| {
+            let v = Version::parse(&r.version).ok()?;
+            Some((v, r))
+        })
+        .max_by(|(v1, _), (v2, _)| v1.cmp(v2));
+
+    if let Some((_, release)) = latest_release {
+        let response = UpdateResponse {
+            version: release.version,
+            url: release.url,
+            signature: release.signature,
+            pub_date: release.pub_date,
+            notes: release.notes,
+        };
+        return (StatusCode::OK, Json(Some(response)));
+    }
+
+    (StatusCode::NO_CONTENT, Json(None))
+}
+
+// Handler to download the latest release (redirect)
+pub async fn download_latest_release(
+    Path((app_name, target, arch)): Path<(String, String, String)>,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    println!(
+        "Received latest download request: app_name={}, target={}, arch={}",
+        app_name, target, arch
+    );
+
+    // Fetch all releases for this app/target/arch
+    let releases = sqlx::query_as::<_, Release>(
+        "SELECT id, app_name, target, arch, version, url, signature, pub_date, notes FROM releases WHERE app_name = ? AND target = ? AND arch = ?"
+    )
+    .bind(&app_name)
+    .bind(&target)
+    .bind(&arch)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_else(|_| vec![]);
+
+    // Find the latest version
+    let latest_release = releases
+        .into_iter()
+        .filter_map(|r| {
+            let v = Version::parse(&r.version).ok()?;
+            Some((v, r))
+        })
+        .max_by(|(v1, _), (v2, _)| v1.cmp(v2));
+
+    if let Some((_, release)) = latest_release {
+        println!("Redirecting to: {}", release.url);
+        return axum::response::Redirect::temporary(&release.url).into_response();
+    }
+
+    (StatusCode::NOT_FOUND, "No release found").into_response()
+}
