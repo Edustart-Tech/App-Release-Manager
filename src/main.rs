@@ -19,6 +19,7 @@ struct AppState {
 #[derive(Debug, Serialize, FromRow)]
 struct Release {
     id: i64,
+    app_name: String,
     target: String,
     arch: String,
     version: String,
@@ -57,6 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         r#"
         CREATE TABLE IF NOT EXISTS releases (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            app_name TEXT NOT NULL,
             target TEXT NOT NULL,
             arch TEXT NOT NULL,
             version TEXT NOT NULL,
@@ -80,11 +82,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Seeding database with dummy data");
         sqlx::query(
             r#"
-            INSERT INTO releases (target, arch, version, url, signature, pub_date, notes)
+            INSERT INTO releases (app_name, target, arch, version, url, signature, pub_date, notes)
             VALUES 
-            ('darwin', 'aarch64', '1.0.1', 'https://github.com/user/repo/releases/download/v1.0.1/app-aarch64.app.tar.gz', 'sig123', '2024-01-01T12:00:00Z', 'Initial release'),
-            ('darwin', 'x86_64', '1.0.1', 'https://github.com/user/repo/releases/download/v1.0.1/app-x64.app.tar.gz', 'sig123', '2024-01-01T12:00:00Z', 'Initial release'),
-            ('windows', 'x86_64', '1.0.1', 'https://github.com/user/repo/releases/download/v1.0.1/app-setup.exe', 'sig123', '2024-01-01T12:00:00Z', 'Initial release')
+            ('classprime', 'darwin', 'aarch64', '1.0.1', 'https://github.com/user/repo/releases/download/v1.0.1/app-aarch64.app.tar.gz', 'sig123', '2024-01-01T12:00:00Z', 'Initial release'),
+            ('classprime', 'darwin', 'x86_64', '1.0.1', 'https://github.com/user/repo/releases/download/v1.0.1/app-x64.app.tar.gz', 'sig123', '2024-01-01T12:00:00Z', 'Initial release'),
+            ('classfi', 'windows', 'x86_64', '1.0.1', 'https://github.com/user/repo/releases/download/v1.0.1/app-setup.exe', 'sig123', '2024-01-01T12:00:00Z', 'Initial release')
             "#,
         )
         .execute(&pool)
@@ -94,7 +96,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = AppState { pool };
 
     let app = Router::new()
-        .route("/{target}/{arch}/{current_version}", get(check_update))
+        .route(
+            "/{app_name}/{target}/{arch}/{current_version}",
+            get(check_update),
+        )
         .layer(CorsLayer::permissive())
         .with_state(state);
 
@@ -109,21 +114,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 // Handler for the update check
 async fn check_update(
-    Path((target, arch, current_version)): Path<(String, String, String)>,
+    Path((app_name, target, arch, current_version)): Path<(String, String, String, String)>,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
+    println!(
+        "Received update check: app_name={}, target={}, arch={}, version={}",
+        app_name, target, arch, current_version
+    );
+
     let current_ver = match Version::parse(&current_version) {
         Ok(v) => v,
-        Err(_) => return (StatusCode::BAD_REQUEST, Json(None)),
+        Err(e) => {
+            println!(
+                "Failed to parse current version '{}': {}",
+                current_version, e
+            );
+            return (StatusCode::BAD_REQUEST, Json(None));
+        }
     };
 
-    // Fetch all releases for this target/arch
+    // Fetch all releases for this app/target/arch
     // We fetch all because SQLite doesn't do semver comparison easily.
     let releases = sqlx::query_as::<_, Release>(
-        "SELECT id, target, arch, version, url, signature, pub_date, notes FROM releases WHERE target = ? AND arch = ?"
+        "SELECT id, app_name, target, arch, version, url, signature, pub_date, notes FROM releases WHERE app_name = ? AND target = ? AND arch = ?"
     )
-    .bind(target)
-    .bind(arch)
+    .bind(&app_name)
+    .bind(&target)
+    .bind(&arch)
     .fetch_all(&state.pool)
     .await
     .unwrap_or_else(|_| vec![]);
@@ -141,7 +158,8 @@ async fn check_update(
         })
         .max_by(|(v1, _), (v2, _)| v1.cmp(v2)); // Find the highest version
 
-    if let Some((_, release)) = latest_update {
+    if let Some((v, release)) = latest_update {
+        println!("Update available: {} -> {}", current_version, v);
         // Return 200 with update info
         let response = UpdateResponse {
             version: release.version,
@@ -153,6 +171,10 @@ async fn check_update(
         return (StatusCode::OK, Json(Some(response)));
     }
 
+    println!(
+        "No update available for {} {} {} {}",
+        app_name, target, arch, current_version
+    );
     // No update available
     (StatusCode::NO_CONTENT, Json(None))
 }
