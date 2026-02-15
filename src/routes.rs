@@ -324,3 +324,8 @@ pub async fn download_latest_release(
 
     (StatusCode::NOT_FOUND, "No release found").into_response()
 }
+
+// Handler for the root route
+pub async fn root() -> &'static str {
+    "Updater Service Running"
+}

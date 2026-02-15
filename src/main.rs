@@ -73,6 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = AppState { pool };
 
     let app = Router::new()
+        .route("/", get(routes::root))
         .route(
             "/{app_name}/{target}/{arch}/{current_version}",
             get(routes::check_update),
@@ -90,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     println!("listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
