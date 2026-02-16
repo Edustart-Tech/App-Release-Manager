@@ -5,7 +5,7 @@ on:
     branches: [ "main" ]
     # paths:
     #   - 'internal/updater/**'
-  workflow_dispatch:
+#   workflow_dispatch:
 
 env:
   IMAGE_NAME: edustartech/edustartech:app-release-manager
@@ -13,9 +13,9 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: internal/updater
+    # defaults:
+    #   run:
+    #     working-directory: internal/updater
 
     steps:
       - name: Checkout code
