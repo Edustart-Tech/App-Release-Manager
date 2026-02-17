@@ -77,6 +77,7 @@ use utoipa_swagger_ui::SwaggerUi;
         routes::upload_release,
         routes::get_latest_version,
         routes::download_latest_release,
+        routes::get_releases,
         routes::root
     ),
     components(
@@ -96,6 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app = Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/", get(routes::root))
+        .route("/releases", get(routes::get_releases))
         .route(
             "/{app_name}/{target}/{arch}/{current_version}",
             get(routes::check_update),

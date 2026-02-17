@@ -393,3 +393,43 @@ pub async fn download_latest_release(
 pub async fn root() -> &'static str {
     "Updater Service Running"
 }
+
+/// Get all releases
+#[utoipa::path(
+    get,
+    path = "/releases",
+    responses(
+        (status = 200, description = "List of all releases", body = Vec<Release>)
+    )
+)]
+pub async fn get_releases(State(state): State<AppState>) -> impl IntoResponse {
+    let releases = sqlx::query_as::<_, Release>(
+        "SELECT id, app_name, target, arch, version, url, signature, pub_date, notes FROM releases ORDER BY pub_date DESC"
+    )
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_else(|_| vec![]);
+
+    let mut buf = Vec::new();
+    let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
+    let mut ser = serde_json::Serializer::with_formatter(&mut buf, formatter);
+    match serde::Serialize::serialize(&releases, &mut ser) {
+        Ok(_) => {
+            let json_string = String::from_utf8(buf).unwrap_or_default();
+            (
+                StatusCode::OK,
+                [("content-type", "application/json")],
+                json_string,
+            )
+                .into_response()
+        }
+        Err(e) => {
+            println!("Error serializing releases: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to serialize releases",
+            )
+                .into_response()
+        }
+    }
+}
