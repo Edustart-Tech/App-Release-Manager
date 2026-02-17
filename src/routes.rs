@@ -182,8 +182,7 @@ pub async fn upload_release(
         .build()
         .unwrap();
     let owner = std::env::var("GITHUB_OWNER").unwrap_or_else(|_| "Edustart-Tech".into());
-    let repo =
-        std::env::var("GITHUB_REPO").unwrap_or_else(|_| "Desktop-application-Release".into());
+    let repo = std::env::var("GITHUB_REPO").unwrap_or_else(|_| "App-Release-Manager".into());
     let tag = format!("{}-v{}", app_name, version);
 
     println!("Checking if release tag {} exists...", tag);
