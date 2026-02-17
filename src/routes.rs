@@ -1,4 +1,6 @@
-use crate::schema::{AppState, Release, UpdateResponse};
+use crate::schema::{
+    AppState, Release, SupportedApp, SupportedTarget, UpdateResponse, UploadReleaseForm,
+};
 use axum::extract::Multipart;
 
 use axum::{
@@ -8,7 +10,22 @@ use axum::{
 };
 use semver::Version;
 
-// Handler for the update check
+/// Check for updates
+#[utoipa::path(
+    get,
+    path = "/{app_name}/{target}/{arch}/{current_version}",
+    params(
+        ("app_name" = SupportedApp, Path, description = "Application name"),
+        ("target" = SupportedTarget, Path, description = "Target OS"),
+        ("arch" = String, Path, description = "Architecture (e.g., aarch64, x86_64)"),
+        ("current_version" = String, Path, description = "Current version of the application")
+    ),
+    responses(
+        (status = 200, description = "Update available", body = UpdateResponse),
+        (status = 204, description = "No update available"),
+        (status = 400, description = "Bad request (invalid version format)")
+    )
+)]
 pub async fn check_update(
     Path((app_name, target, arch, current_version)): Path<(String, String, String, String)>,
     State(state): State<AppState>,
@@ -75,6 +92,18 @@ pub async fn check_update(
     (StatusCode::NO_CONTENT, Json(None))
 }
 
+/// Upload a new release
+#[utoipa::path(
+    post,
+    path = "/upload",
+    request_body(content = UploadReleaseForm, content_type = "multipart/form-data"),
+    responses(
+        (status = 201, description = "Release created successfully", body = String),
+        (status = 400, description = "Bad request"),
+        (status = 409, description = "Conflict - Asset already exists"),
+        (status = 500, description = "Internal server error")
+    )
+)]
 pub async fn upload_release(
     State(state): State<AppState>,
     mut multipart: Multipart,
@@ -243,6 +272,20 @@ pub async fn upload_release(
     (StatusCode::CREATED, Json(download_url)).into_response()
 }
 
+/// Get the latest version
+#[utoipa::path(
+    get,
+    path = "/latest/{app_name}/{target}/{arch}",
+    params(
+        ("app_name" = SupportedApp, Path, description = "Application name"),
+        ("target" = SupportedTarget, Path, description = "Target OS"),
+        ("arch" = String, Path, description = "Architecture")
+    ),
+    responses(
+        (status = 200, description = "Latest version found", body = UpdateResponse),
+        (status = 204, description = "No version found")
+    )
+)]
 // Handler to get the latest version (without update check logic)
 pub async fn get_latest_version(
     Path((app_name, target, arch)): Path<(String, String, String)>,
@@ -287,6 +330,20 @@ pub async fn get_latest_version(
     (StatusCode::NO_CONTENT, Json(None))
 }
 
+/// Download the latest release
+#[utoipa::path(
+    get,
+    path = "/download/latest/{app_name}/{target}/{arch}",
+    params(
+        ("app_name" = SupportedApp, Path, description = "Application name"),
+        ("target" = SupportedTarget, Path, description = "Target OS"),
+        ("arch" = String, Path, description = "Architecture")
+    ),
+    responses(
+        (status = 307, description = "Redirect to download URL"),
+        (status = 404, description = "No release found")
+    )
+)]
 // Handler to download the latest release (redirect)
 pub async fn download_latest_release(
     Path((app_name, target, arch)): Path<(String, String, String)>,
@@ -325,6 +382,14 @@ pub async fn download_latest_release(
     (StatusCode::NOT_FOUND, "No release found").into_response()
 }
 
+/// Root endpoint
+#[utoipa::path(
+    get,
+    path = "/",
+    responses(
+        (status = 200, description = "Service is running", body = String)
+    )
+)]
 // Handler for the root route
 pub async fn root() -> &'static str {
     "Updater Service Running"

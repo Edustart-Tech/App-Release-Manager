@@ -67,12 +67,34 @@ async fn ensure_db() -> Result<Pool<Sqlite>, sqlx::Error> {
     return Ok(pool);
 }
 
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        routes::check_update,
+        routes::upload_release,
+        routes::get_latest_version,
+        routes::download_latest_release,
+        routes::root
+    ),
+    components(
+        schemas(schema::Release, schema::UpdateResponse, schema::UploadReleaseForm, schema::SupportedApp, schema::SupportedTarget)
+    ),
+    tags(
+        (name = "updater", description = "Updater API")
+    )
+)]
+struct ApiDoc;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pool = ensure_db().await?;
     let state = AppState { pool };
 
     let app = Router::new()
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/", get(routes::root))
         .route(
             "/{app_name}/{target}/{arch}/{current_version}",
