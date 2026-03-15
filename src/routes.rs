@@ -234,7 +234,7 @@ pub async fn upload_release(
     let asset = match octo
         .repos(&owner, &repo)
         .releases()
-        .upload_asset(*release.id, &file_name, file_data.into())
+        .upload_asset(*release.id, &file_name, file_data.clone().into())
         .send()
         .await
     {
@@ -255,7 +255,69 @@ pub async fn upload_release(
         }
     };
 
-    let download_url = asset.browser_download_url.to_string();
+    let github_download_url = asset.browser_download_url.to_string();
+    let mut final_download_url = github_download_url.clone();
+
+    // 3. Mega.io S4 Integration
+    let s4_endpoint = std::env::var("S4_ENDPOINT").unwrap_or_default();
+    let s4_bucket_name = std::env::var("S4_BUCKET").unwrap_or_default();
+    let s4_access_key = std::env::var("S4_ACCESS_KEY").unwrap_or_default();
+    let s4_secret_key = std::env::var("S4_SECRET_KEY").unwrap_or_default();
+    let s4_region = std::env::var("S4_REGION").unwrap_or_else(|_| "auto".to_string());
+
+    if !s4_endpoint.is_empty() && !s4_bucket_name.is_empty() {
+        println!("Uploading to S4 object storage...");
+        let region = s3::region::Region::Custom {
+            region: s4_region,
+            endpoint: s4_endpoint.clone(),
+        };
+        
+        match s3::creds::Credentials::new(Some(&s4_access_key), Some(&s4_secret_key), None, None, None) {
+            Ok(credentials) => {
+                match s3::bucket::Bucket::new(&s4_bucket_name, region, credentials) {
+                    Ok(mut bucket) => {
+                        bucket = bucket.with_path_style();
+                        let s4_key = format!("{}/{}/{}/{}/{}", app_name, version, target, arch, file_name);
+                        
+                        match bucket.put_object(&s4_key, &file_data).await {
+                            Ok(res) => {
+                                println!("S4 Upload successful! Status code: {}", res.status_code());
+                                
+                                // Construct the public URL
+                                // Using the endpoint which includes the account ID as the user mentioned
+                                let endpoint_trimmed = s4_endpoint.trim_end_matches('/');
+                                let public_url = format!("{}/{}/{}", endpoint_trimmed, s4_bucket_name, s4_key);
+                                println!("S4 Download URL: {}", public_url);
+                                
+                                // Allow an explicit override for the public URL base if provided
+                                let override_base = std::env::var("S4_PUBLIC_URL_BASE").unwrap_or_default();
+                                if !override_base.is_empty() {
+                                    final_download_url = format!("{}/{}/{}", override_base.trim_end_matches('/'), s4_bucket_name, s4_key);
+                                } else {
+                                    final_download_url = public_url;
+                                }
+                            },
+                            Err(e) => {
+                                println!("S4 Upload failed: {:?}", e);
+                            }
+                        }
+
+                        // Upload changelogs.txt if notes are provided
+                        if !notes.trim().is_empty() {
+                            let changelog_key = format!("{}/{}/{}/{}/changelogs.txt", app_name, version, target, arch);
+                            println!("Uploading changelog to S4: {}", changelog_key);
+                            match bucket.put_object(&changelog_key, notes.as_bytes()).await {
+                                Ok(res) => println!("S4 Changelog upload successful! Status code: {}", res.status_code()),
+                                Err(e) => println!("S4 Changelog upload failed: {:?}", e)
+                            }
+                        }
+                    },
+                    Err(e) => println!("Failed to initialize S4 Bucket: {:?}", e)
+                }
+            },
+            Err(e) => println!("Failed to initialize S4 Credentials: {:?}", e)
+        }
+    }
 
     // 4. Save to Database
     println!("Saving release to local database...");
@@ -264,11 +326,11 @@ pub async fn upload_release(
         "INSERT OR IGNORE INTO releases (app_name, target, arch, version, url, signature, pub_date, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&app_name).bind(&target).bind(&arch).bind(&version)
-    .bind(&download_url).bind(&signature).bind(&pub_date).bind(&notes)
+    .bind(&final_download_url).bind(&signature).bind(&pub_date).bind(&notes)
     .execute(&state.pool).await.unwrap();
 
     println!("Release process completed successfully.");
-    (StatusCode::CREATED, Json(download_url)).into_response()
+    (StatusCode::CREATED, axum::response::Json(final_download_url)).into_response()
 }
 
 /// Get the latest version

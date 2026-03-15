@@ -44,12 +44,12 @@ jobs:
         if: success()
         run: |
           curl -X 'POST' \
-          "${{ vars.DOKPLOY_WEBHOOK_URL }}" \
+          "https://dokploy.edustartech.com/api/deploy/nDu7FC_Df8_qN_w7lqaB6" \
           -H 'accept: application/json' \
-          -H 'Authorization: Bearer ${{ secrets.DOKPLOY_TOKEN }}' \
+          -H 'Authorization: Bearer nHGvJdJcvpNnZsJNUGzdemOsuZedMZtVeFoICiqvBvywlXpXWDesuTyPtlugGPER' \
           -H 'Content-Type: application/json' \
           -d '{
               "json":{
-                  "applicationId": "internal-apps-app-release-manager-dlf31b"
+                  "applicationId": "others-app-release-manager-6uiyvx"
               }
           }'
