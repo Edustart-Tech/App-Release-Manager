@@ -15,9 +15,23 @@ async fn ensure_db() -> Result<Pool<Sqlite>, sqlx::Error> {
     let database_url =
         std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:updater.db".to_string());
 
+    // Extract path from database URL (remove sqlite:// or sqlite:)
+    let db_path = if database_url.starts_with("sqlite://") {
+        database_url.trim_start_matches("sqlite://")
+    } else {
+        database_url.trim_start_matches("sqlite:")
+    };
+
+    // Ensure the parent directory exists
+    if let Some(parent) = std::path::Path::new(db_path).parent() {
+        if !parent.exists() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+
     // Create the database file if it doesn't exist
-    if !std::path::Path::new("updater.db").exists() {
-        std::fs::File::create("updater.db")?;
+    if !std::path::Path::new(db_path).exists() {
+        std::fs::File::create(db_path)?;
     }
 
     let pool = SqlitePoolOptions::new()

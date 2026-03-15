@@ -10,7 +10,12 @@ services:
       - "3000:3000"
     env_file:
       - .env
+    environment:
+      - DATABASE_URL=sqlite:///app/data/updater.db
     volumes:
-      # Mount the SQLite database to persist releases across container restarts
-      - ./updater.db:/app/updater.db
+      # Mount a Docker volume for the database
+      - updater_data:/app/data
     restart: unless-stopped
+
+volumes:
+  updater_data:
