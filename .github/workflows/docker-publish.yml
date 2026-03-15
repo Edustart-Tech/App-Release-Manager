@@ -53,7 +53,7 @@ jobs:
           curl -X 'POST' \
           "https://dokploy.edustartech.com/api/deploy/nDu7FC_Df8_qN_w7lqaB6" \
           -H 'accept: application/json' \
-          -H 'Authorization: Bearer nHGvJdJcvpNnZsJNUGzdemOsuZedMZtVeFoICiqvBvywlXpXWDesuTyPtlugGPER' \
+          -H 'Authorization: Bearer ${{ secrets.DOKPLOY_TOKEN }}' \
           -H 'Content-Type: application/json' \
           -d '{
               "json":{
