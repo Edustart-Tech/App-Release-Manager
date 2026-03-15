@@ -271,32 +271,49 @@ pub async fn upload_release(
             region: s4_region,
             endpoint: s4_endpoint.clone(),
         };
-        
-        match s3::creds::Credentials::new(Some(&s4_access_key), Some(&s4_secret_key), None, None, None) {
+
+        match s3::creds::Credentials::new(
+            Some(&s4_access_key),
+            Some(&s4_secret_key),
+            None,
+            None,
+            None,
+        ) {
             Ok(credentials) => {
                 match s3::bucket::Bucket::new(&s4_bucket_name, region, credentials) {
                     Ok(mut bucket) => {
                         bucket = bucket.with_path_style();
-                        let s4_key = format!("{}/{}/{}/{}/{}", app_name, version, target, arch, file_name);
-                        
+                        let s4_key =
+                            format!("{}/{}/{}/{}/{}", app_name, version, target, arch, file_name);
+
                         match bucket.put_object(&s4_key, &file_data).await {
                             Ok(res) => {
-                                println!("S4 Upload successful! Status code: {}", res.status_code());
-                                
+                                println!(
+                                    "S4 Upload successful! Status code: {}",
+                                    res.status_code()
+                                );
+
                                 // Construct the public URL
                                 // Using the endpoint which includes the account ID as the user mentioned
                                 let endpoint_trimmed = s4_endpoint.trim_end_matches('/');
-                                let public_url = format!("{}/{}/{}", endpoint_trimmed, s4_bucket_name, s4_key);
+                                let public_url =
+                                    format!("{}/{}/{}", endpoint_trimmed, s4_bucket_name, s4_key);
                                 println!("S4 Download URL: {}", public_url);
-                                
+
                                 // Allow an explicit override for the public URL base if provided
-                                let override_base = std::env::var("S4_PUBLIC_URL_BASE").unwrap_or_default();
+                                let override_base =
+                                    std::env::var("S4_PUBLIC_URL_BASE").unwrap_or_default();
                                 if !override_base.is_empty() {
-                                    final_download_url = format!("{}/{}/{}", override_base.trim_end_matches('/'), s4_bucket_name, s4_key);
+                                    final_download_url = format!(
+                                        "{}/{}/{}",
+                                        override_base.trim_end_matches('/'),
+                                        s4_bucket_name,
+                                        s4_key
+                                    );
                                 } else {
                                     final_download_url = public_url;
                                 }
-                            },
+                            }
                             Err(e) => {
                                 println!("S4 Upload failed: {:?}", e);
                             }
@@ -304,18 +321,24 @@ pub async fn upload_release(
 
                         // Upload changelogs.txt if notes are provided
                         if !notes.trim().is_empty() {
-                            let changelog_key = format!("{}/{}/{}/{}/changelogs.txt", app_name, version, target, arch);
+                            let changelog_key = format!(
+                                "{}/{}/{}/{}/changelogs.txt",
+                                app_name, version, target, arch
+                            );
                             println!("Uploading changelog to S4: {}", changelog_key);
                             match bucket.put_object(&changelog_key, notes.as_bytes()).await {
-                                Ok(res) => println!("S4 Changelog upload successful! Status code: {}", res.status_code()),
-                                Err(e) => println!("S4 Changelog upload failed: {:?}", e)
+                                Ok(res) => println!(
+                                    "S4 Changelog upload successful! Status code: {}",
+                                    res.status_code()
+                                ),
+                                Err(e) => println!("S4 Changelog upload failed: {:?}", e),
                             }
                         }
-                    },
-                    Err(e) => println!("Failed to initialize S4 Bucket: {:?}", e)
+                    }
+                    Err(e) => println!("Failed to initialize S4 Bucket: {:?}", e),
                 }
-            },
-            Err(e) => println!("Failed to initialize S4 Credentials: {:?}", e)
+            }
+            Err(e) => println!("Failed to initialize S4 Credentials: {:?}", e),
         }
     }
 
@@ -330,7 +353,11 @@ pub async fn upload_release(
     .execute(&state.pool).await.unwrap();
 
     println!("Release process completed successfully.");
-    (StatusCode::CREATED, axum::response::Json(final_download_url)).into_response()
+    (
+        StatusCode::CREATED,
+        axum::response::Json(final_download_url),
+    )
+        .into_response()
 }
 
 /// Get the latest version
