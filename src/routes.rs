@@ -30,10 +30,11 @@ pub async fn check_update(
     Path((app_name, target, arch, current_version)): Path<(String, String, String, String)>,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
-    println!(
-        "Received update check: app_name={}, target={}, arch={}, version={}",
-        app_name, target, arch, current_version
-    );
+    println!("🚀 Incoming Update Check:");
+    println!("   AppName: {}", app_name);
+    println!("   Target:  {}", target);
+    println!("   Arch:    {}", arch);
+    println!("   Version: {}", current_version);
 
     let current_ver = match Version::parse(&current_version) {
         Ok(v) => v,
@@ -72,7 +73,10 @@ pub async fn check_update(
         .max_by(|(v1, _), (v2, _)| v1.cmp(v2)); // Find the highest version
 
     if let Some((v, release)) = latest_update {
-        println!("Update available: {} -> {}", current_version, v);
+    println!(
+        "✅ Update available for {} {} {}: {} -> {}",
+        app_name, target, arch, current_version, v
+    );
         // Return 200 with update info
         let response = UpdateResponse {
             version: release.version,
@@ -85,7 +89,7 @@ pub async fn check_update(
     }
 
     println!(
-        "No update available for {} {} {} {}",
+        "ℹ️  No update available for {} {} {} (current: {})",
         app_name, target, arch, current_version
     );
     // No update available
@@ -379,10 +383,10 @@ pub async fn get_latest_version(
     Path((app_name, target, arch)): Path<(String, String, String)>,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
-    println!(
-        "Received latest version check: app_name={}, target={}, arch={}",
-        app_name, target, arch
-    );
+    println!("🔍 Latest Version Check:");
+    println!("   AppName: {}", app_name);
+    println!("   Target:  {}", target);
+    println!("   Arch:    {}", arch);
 
     // Fetch all releases for this app/target/arch
     let releases = sqlx::query_as::<_, Release>(
