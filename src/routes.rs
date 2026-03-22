@@ -350,7 +350,7 @@ pub async fn upload_release(
     println!("Saving release to local database...");
     let pub_date = chrono::Utc::now().to_rfc3339();
     sqlx::query(
-        "INSERT OR IGNORE INTO releases (app_name, target, arch, version, url, signature, pub_date, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        "INSERT OR REPLACE INTO releases (app_name, target, arch, version, url, signature, pub_date, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     )
     .bind(&app_name).bind(&target).bind(&arch).bind(&version)
     .bind(&final_download_url).bind(&signature).bind(&pub_date).bind(&notes)
